@@ -79,6 +79,7 @@ char directional_chars[] = {'w', 'd', 'a', 's'};
 
 // Probability constants
 #define PROBABILITY_OF_ENEMY_APPEARING 0.02
+#define PROBABILITY_OF_TEAMMATE_APPEARING 0.01
 #define PROBABILITY_OF_BOSS_APPEARING 0.01
 #define PROBABILITY_OF_ENEMY_MOVING 0.5
 #define PROBABILITY_OF_ENEMY_SHOOTING 0.3
@@ -150,6 +151,7 @@ public:
 
 class Bullet;
 class Enemy;
+class TeamMate;
 class Boss;
 class Player;
 class Obstacle;
@@ -164,6 +166,7 @@ namespace game {
 
     std::vector<Bullet> bullets;
     std::vector<Enemy> enemies;
+    std::vector<TeamMate> team_mates;
     std::vector<Obstacle> obstacles;
     std::vector<Boss> bosses;
     std::vector<Mine> mines;
@@ -414,9 +417,33 @@ public:
     }
 
     void fireBullet();
-
     void turn(bool smart, Player &player);
+    void move();
+};
 
+
+class TeamMate: public Character {
+public:
+
+    int value; // character value (an Enemy's skin will be its value)
+    char skin;
+
+    TeamMate(int x_origin, int y_origin, int direction): Character(x_origin, y_origin, direction) {
+        this->value = rand()%9+1;
+        this->skin = std::to_string(this->value).c_str()[0];
+        this->alive = true;
+    }
+
+    char getSkin() {
+        if (!this->alive)
+            this->skin = DIED_SKIN;
+        else
+            this->skin = std::to_string(this->value).c_str()[0];
+        return this->skin;
+    }
+
+    void fireBullet();
+    void turn(bool, Boss&);
     void move();
 };
 
@@ -615,6 +642,12 @@ void Enemy::fireBullet() {
 }
 
 
+void TeamMate::fireBullet() {
+    Bullet bullet(this->x, this->y, rand()%3+1, this->direction, PLAYER);
+    game::bullets.push_back(bullet);
+}
+
+
 void Enemy::turn(bool smart, Player &player) {
     if (smart) {
         // If the enemy can see the player, it will fire
@@ -656,7 +689,91 @@ void Enemy::turn(bool smart, Player &player) {
 }
 
 
+void TeamMate::turn(bool smart, Boss& boss) {
+    if (smart) {
+        // If the TeamMate can see the boss, it will fire
+        if (this->x == boss.x && this->y == boss.y) {
+            this->fireBullet();
+        } else if (this->x == boss.x) {
+            if (this->y > boss.y) {
+                this->direction = NORTH;
+            } else {
+                this->direction = SOUTH;
+            }
+        } else if (this->y == boss.y) {
+            if (this->x > boss.x) {
+                this->direction = WEST;
+            } else {
+                this->direction = EAST;
+            }
+        } else {
+            // If the boss can't see the boss, it will move towards the boss's coordinates
+            if (abs(this->x - boss.x) < abs(this->y - boss.y)) { // You are closer to the x coordinate of the boss
+                if (this->x > boss.x) {
+                    this->direction = WEST;
+                } else {
+                    this->direction = EAST;
+                }
+            } else {
+                if (this->y > boss.y) {
+                    this->direction = NORTH;
+                } else {
+                    this->direction = SOUTH;
+                }
+            }
+        }
+
+    } else {
+        // As of now it's just a random turn, but it could be a smarter one
+        this->direction = directional_constants[rand()%4];
+    }
+}
+
+
 void Enemy::move() {
+    int previous_x=this->x, previous_y=this->y;
+
+    if (this->direction == NORTH) {
+        if (!game::obstacles_field[this->y-1][this->x])
+            this->y--;
+    } else if (this->direction == EAST) {
+        if (!game::obstacles_field[this->y][this->x+1])
+            this->x++;
+    } else if (this->direction == WEST) {
+        if (!game::obstacles_field[this->y][this->x-1])
+            this->x--;
+    } else if (this->direction == SOUTH) {
+        if (!game::obstacles_field[this->y+1][this->x])
+            this->y++;
+    }
+
+    if (this->x <= 0 || this->x >= 49 || this->y <= 0 || this->y >= 19) {
+        if (this->x <= 0 && this->direction == WEST) {
+            if (!game::obstacles_field[this->y][48])
+                this->x = 48;
+            else
+                this->x = previous_x;
+        } else if (this->x >= 49 && this->direction == EAST) {
+            if (!game::obstacles_field[this->y][1])
+                this->x = 1;
+            else
+                this->x = previous_x;
+        } else if (this->y <= 0 && this->direction == NORTH) {
+            if (!game::obstacles_field[18][this->x])
+                this->y = 18;
+            else
+                this->y = previous_y;
+        } else if (this->y >= 19 && this->direction == SOUTH) {
+            if (!game::obstacles_field[1][this->x])
+                this->y = 1;
+            else
+                this->y = previous_y;
+        }
+    }
+}
+
+
+void TeamMate::move() {
     int previous_x=this->x, previous_y=this->y;
 
     if (this->direction == NORTH) {
@@ -824,6 +941,10 @@ namespace game {
 
         void addEnemy(int x, int y) {
             game::enemies.push_back(Enemy(x, y, direction()));
+        }
+
+        void addTeammate(int x, int y) {
+            game::team_mates.push_back(TeamMate(x, y, direction()));
         }
 
         void addBoss(int x, int y) {

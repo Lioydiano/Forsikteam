@@ -1,8 +1,8 @@
 #include "game.hpp"
-// g++ forsiktig.cpp -o forsiktig.exe
+// g++ forsikteam.cpp -o forsikteam.exe
 
 #define VERSION "1.7.0"
-#define DATE "14-10-2022"
+#define DATE "19-11-2022"
 
 
 int main(int argc, char* argv[]) {

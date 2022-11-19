@@ -32,6 +32,15 @@ void printField() {
                     goto escape;
                 }
             }
+            for (int k = 0; k < game::team_mates.size(); k++) {
+                if (i == game::team_mates[k].y && j == game::team_mates[k].x) {
+                    if (game::team_mates[k].alive)
+                        std::cout << std::string("\x1b[1m\x1B[33m") + game::team_mates[k].skin + std::string("\033[0m");
+                    else
+                        std::cout << "\x1B[33m@\033[0m";
+                    goto escape;
+                }
+            }
             for (int k = 0; k < game::bosses.size(); k++) {
                 if (i == game::bosses[k].y && j == game::bosses[k].x) {
                     if (game::bosses[k].alive)
@@ -139,6 +148,11 @@ void updateField() {
             enemies.erase(enemies.begin() + i); // remove enemy
     }
 
+    for (int i=0; i<team_mates.size(); i++) {
+        if (!team_mates[i].alive)
+            team_mates.erase(team_mates.begin() + i); // remove team mate
+    }
+
     for (int i=0; i<bosses.size(); i++) {
         if (!bosses[i].alive)
             bosses.erase(bosses.begin() + i); // remove boss
@@ -173,6 +187,22 @@ void updateField() {
                 if (enemies[j].value == 0) {
                     std::cout << '\x07'; // Beep
                     enemies[j].alive = false;
+                    player.kills++;
+                }
+
+                bullets[i].active = false;
+                bullets.erase(bullets.begin() + i); // remove bullet from the vector
+                break;
+            }
+        }
+        for (int j=0; j<team_mates.size(); j++) {
+            if (bullets[i].x == team_mates[j].x && bullets[i].y == team_mates[j].y && bullets[i].fired == ENEMY) {
+                player.ammunitions += team_mates[j].value;
+                team_mates[j].value--;
+
+                if (team_mates[j].value == 0) {
+                    std::cout << '\x07'; // Beep
+                    team_mates[j].alive = false;
                     player.kills++;
                 }
 
@@ -285,6 +315,7 @@ void mainloop() {
     }
     srand(time(NULL));
 
+    game::random::addTeammate(rand()%48+1, rand()%18+1);
     for (int i=0; i<game::starting_enemies; i++)
         game::enemies.push_back(Enemy(rand()%48+1, rand()%18+1, SOUTH));
     player.ammunitions = game::starting_ammunitions;
@@ -307,6 +338,7 @@ void mainloop() {
     std::bernoulli_distribution boss_shooting_distribution(PROBABILITY_OF_BOSS_SHOOTING);
     std::bernoulli_distribution moving_distribution(PROBABILITY_OF_ENEMY_MOVING);
     std::bernoulli_distribution appearing_distribution(PROBABILITY_OF_ENEMY_APPEARING);
+    std::bernoulli_distribution team_mate_appearing_distribution(PROBABILITY_OF_TEAMMATE_APPEARING);
     std::bernoulli_distribution intelligence_distribution(game::AI);
     std::bernoulli_distribution obstacle_distribution(PROBABILITY_OF_OBSTACLE);
     std::bernoulli_distribution boss_distribution(PROBABILITY_OF_BOSS_APPEARING);
@@ -323,6 +355,20 @@ void mainloop() {
             updateField();
             printField();
 
+            for (auto& teammate: game::team_mates) {
+                if (!teammate.alive)
+                    continue;
+                if (turning_distribution(gen)) {
+                    if (!game::bosses.empty())
+                        teammate.turn(true, game::bosses[0]);
+                    else
+                        teammate.direction = game::random::direction();
+                } else if (shooting_distribution(gen)) {
+                    teammate.fireBullet();
+                } else if (moving_distribution(gen)) {
+                    teammate.move();
+                }
+            }
             for (auto& enemy: game::enemies) {
                 if (!enemy.alive)
                     continue;
@@ -346,6 +392,8 @@ void mainloop() {
             }
             if (appearing_distribution(gen))
                 game::random::addEnemy(rand()%48+1, rand()%18+1);
+            if (team_mate_appearing_distribution(gen))
+                game::random::addTeammate(rand()%48+1, rand()%18+1);
             if (obstacle_distribution(gen))
                 game::random::addObstacle(rand()%48+1, rand()%18+1);
             if (boss_distribution(gen)) {
