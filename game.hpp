@@ -13,7 +13,7 @@ void printField() {
     for (auto& enemy : game::enemies)
         sum += enemy.alive;
 
-    std::cout << SS;
+    clearScreen(); // Clear screen (prevents flickering)
     for (int i = 0; i < 20; i++) {
         for (int j = 0; j < 50; j++) {
             if (i == player.y && j == player.x) {

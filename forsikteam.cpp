@@ -1,8 +1,8 @@
 #include "game.hpp"
 // g++ forsikteam.cpp -o forsikteam.exe
 
-#define VERSION "1.7.0"
-#define DATE "19-11-2022"
+#define VERSION "1.8.0"
+#define DATE "17-01-2023"
 
 
 int main(int argc, char* argv[]) {
